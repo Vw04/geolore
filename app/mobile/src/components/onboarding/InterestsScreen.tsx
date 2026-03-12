@@ -122,12 +122,12 @@ const styles = StyleSheet.create({
     minHeight: 90,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FFFFF0',
+    borderColor: '#2A9D8F',
     backgroundColor: '#1A3828',
   },
   chipActive: {
     backgroundColor: '#1E5038',
-    borderColor: '#FFFFF0',
+    borderColor: '#2A9D8F',
   },
   chipText: {
     fontFamily: 'Helvetica',

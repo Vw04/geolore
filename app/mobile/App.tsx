@@ -162,6 +162,12 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsBtn}>
+        <View style={styles.menuLine} />
+        <View style={styles.menuLine} />
+        <View style={styles.menuLine} />
+      </TouchableOpacity>
+
       {__DEV__ && (
         <ScrollView
           horizontal
@@ -194,12 +200,7 @@ export default function App() {
       <View style={!hasLoaded ? styles.headerWrapperCentered : undefined}>
         <View style={styles.header}>
           <View style={styles.titleRow}>
-            <BrandLogo size="md" />
-            <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsBtn}>
-              <View style={styles.menuLine} />
-              <View style={styles.menuLine} />
-              <View style={styles.menuLine} />
-            </TouchableOpacity>
+            <BrandLogo size="xl" />
           </View>
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -303,19 +304,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   titleRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
-    position: 'relative',
   },
   settingsBtn: {
     position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    paddingLeft: 12,
+    right: 20,
+    top: 12,
+    zIndex: 10,
+    padding: 8,
     gap: 4,
   },
   menuLine: {
