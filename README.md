@@ -1,4 +1,4 @@
-# Locartefact
+# Geolore
 
 A personal, iPhone-first location-aware fact app. Turn on tracking and receive short, educational facts about nearby places delivered through notifications and stored in a feed.
 
