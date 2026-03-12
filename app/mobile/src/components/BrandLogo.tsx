@@ -2,12 +2,13 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Circle, Ellipse } from 'react-native-svg';
 
-type Size = 'sm' | 'md' | 'lg';
+type Size = 'sm' | 'md' | 'lg' | 'xl';
 
 const SIZES: Record<Size, { r: number; fontSize: number; gap: number }> = {
   sm: { r: 14, fontSize: 24, gap: 8 },
   md: { r: 18, fontSize: 30, gap: 10 },
   lg: { r: 24, fontSize: 40, gap: 12 },
+  xl: { r: 32, fontSize: 52, gap: 14 },
 };
 
 function GlobeIcon({ r }: { r: number }) {

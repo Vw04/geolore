@@ -16,7 +16,7 @@ export default function WelcomeScreen({ onNext }: Props) {
     <View style={styles.container}>
       <View style={styles.center}>
         <View style={styles.hero}>
-          <BrandLogo size="lg" />
+          <BrandLogo size="xl" />
           <Text style={styles.tagline}>Discover the story of where you are.</Text>
         </View>
         <View style={styles.features}>
