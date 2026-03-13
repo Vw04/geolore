@@ -22,8 +22,9 @@ import { getCurrentLocation } from './src/services/location';
 import {
   getOnboardingComplete, setOnboardingComplete, getUserInterests, setUserInterests,
   getNotifSettings, setNotifSettings,
+  getDisplaySettings, setDisplaySettings as saveDisplaySettings,
 } from './src/services/keystore';
-import type { NotifSettings } from './src/services/keystore';
+import type { NotifSettings, DisplaySettings } from './src/services/keystore';
 import { fetchNearbyFacts, reverseGeocodeLabel } from './src/services/wikipedia';
 import { rankFacts } from './src/services/ranking';
 import { synthesizeFacts } from './src/services/synthesis';
@@ -43,7 +44,7 @@ export default function App() {
   const [facts, setFacts] = useState<Fact[]>([]);
   const [status, setStatus] = useState<string>('Tap refresh to discover nearby facts.');
   const [loading, setLoading] = useState<boolean>(false);
-  const [radius, setRadius] = useState<number>(5000);
+  const [radius, setRadius] = useState<number>(1000);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [factCount, setFactCount] = useState<number | null>(null);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
@@ -51,12 +52,14 @@ export default function App() {
   const [interests, setInterests] = useState<string[]>(['All']);
   const [showSettings, setShowSettings] = useState(false);
   const [notifSettings, setNotifState] = useState<NotifSettings>({ enabled: false, frequencyMs: 300000, bulletCount: 2 });
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>({ sortOrder: 'distance', maxFacts: 5 });
 
   useEffect(() => {
     getOnboardingComplete().then((done) => {
       if (done) {
         getUserInterests().then(setInterests);
         getNotifSettings().then(setNotifState);
+        getDisplaySettings().then(setDisplaySettings);
         setOnboardingStep(null);
       } else {
         setOnboardingStep('welcome');
@@ -82,7 +85,12 @@ export default function App() {
 
   const displayedFacts = facts
     .filter((f) => f.distance === 0 || f.distance <= radius)
-    .sort((a, b) => a.distance - b.distance);
+    .sort((a, b) =>
+      displaySettings.sortOrder === 'notable'
+        ? b.extract.length - a.extract.length
+        : a.distance - b.distance
+    )
+    .slice(0, displaySettings.maxFacts);
 
   const radiusLabel = radius >= 1000
     ? `${(radius / 1000).toFixed(1)} km`
@@ -99,15 +107,15 @@ export default function App() {
         fetchNearbyFacts(lat, lon),
         reverseGeocodeLabel(lat, lon),
       ]);
-      const maxPool = !interests.includes('All') ? 60 : 40;
-      const ranked = rankFacts(rawFacts, maxPool);
-      const preSort = [...ranked].sort((a, b) => a.distance - b.distance);
-      setFacts(preSort);
+      const RANK_POOL = 20;
+      const ranked = rankFacts(rawFacts, RANK_POOL);
+      setFacts([...ranked].sort((a, b) => a.distance - b.distance));
       setCurrentCoords({ lat, lon });
       setLocationLabel(geoLabel || label);
       const synthesized = await synthesizeFacts(ranked, interests);
-      const sorted = [...synthesized].sort((a, b) => a.distance - b.distance);
-      setFacts(sorted);
+      const synthesizedMap = new Map(synthesized.map((f) => [f.pageId, f]));
+      const merged = ranked.map((f) => synthesizedMap.get(f.pageId) ?? f);
+      setFacts([...merged].sort((a, b) => a.distance - b.distance));
     } catch {
       setStatus('Location Not Found');
       setFacts([]);
@@ -139,11 +147,13 @@ export default function App() {
     setOnboardingStep(null);
   };
 
-  const handleSaveSettings = async (newInterests: string[], newNotif: NotifSettings) => {
+  const handleSaveSettings = async (newInterests: string[], newNotif: NotifSettings, newDisplay: DisplaySettings) => {
     setInterests(newInterests);
     setNotifState(newNotif);
+    setDisplaySettings(newDisplay);
     await setUserInterests(newInterests);
     await setNotifSettings(newNotif);
+    await saveDisplaySettings(newDisplay);
     setShowSettings(false);
   };
 
@@ -238,7 +248,7 @@ export default function App() {
               <Slider
                 style={styles.slider}
                 minimumValue={0}
-                maximumValue={10000}
+                maximumValue={3000}
                 step={100}
                 value={radius}
                 onValueChange={setRadius}
@@ -246,7 +256,7 @@ export default function App() {
                 maximumTrackTintColor="#1E5038"
                 thumbTintColor="#FFFFF0"
               />
-              <Text style={styles.sliderEndLabel}>10 km</Text>
+              <Text style={styles.sliderEndLabel}>3 km</Text>
             </View>
           </View>
         )}
@@ -265,6 +275,7 @@ export default function App() {
         visible={showSettings}
         interests={interests}
         notifSettings={notifSettings}
+        displaySettings={displaySettings}
         onSave={handleSaveSettings}
         onClose={() => setShowSettings(false)}
       />

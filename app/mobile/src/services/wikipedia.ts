@@ -18,10 +18,23 @@ type PageData = {
   coordinates?: Array<{ lat: number; lon: number }>;
 };
 
-const RADIUS_STEPS = [10000, 25000, 50000];
+const RADIUS_STEPS = [3000, 8000, 20000];
 
 const factCache = new Map<string, { facts: Fact[]; ts: number }>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+// Spread results evenly across 4 distance bands so dense cities (Paris, Tokyo)
+// don't return all articles within the nearest 500m.
+function diverseSample(entries: GeoSearchEntry[], radius: number, limit = 30): GeoSearchEntry[] {
+  const bandSize = radius / 4;
+  const buckets: GeoSearchEntry[][] = [[], [], [], []];
+  for (const e of entries) {
+    const bi = Math.min(3, Math.floor(e.dist / bandSize));
+    buckets[bi].push(e);
+  }
+  const perBand = Math.ceil(limit / 4);
+  return buckets.flatMap((b) => b.slice(0, perBand)).slice(0, limit);
+}
 
 async function geoSearch(lat: number, lon: number, radius: number): Promise<GeoSearchEntry[]> {
   const params = new URLSearchParams({
@@ -29,7 +42,7 @@ async function geoSearch(lat: number, lon: number, radius: number): Promise<GeoS
     list: 'geosearch',
     gscoord: `${lat}|${lon}`,
     gsradius: String(radius),
-    gslimit: '100',
+    gslimit: '200',
     format: 'json',
     origin: '*',
   });
@@ -80,29 +93,32 @@ async function fetchPageDetails(pageIds: number[]): Promise<Record<number, PageD
     chunks.push(pageIds.slice(i, i + 20));
   }
 
-  const allPages: Record<number, PageData> = {};
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const params = new URLSearchParams({
+        action: 'query',
+        pageids: chunk.join('|'),
+        prop: 'extracts|pageimages|coordinates',
+        exintro: 'true',
+        explaintext: 'true',
+        exsentences: '10',
+        pithumbsize: '200',
+        format: 'json',
+        origin: '*',
+      });
+      const res = await fetch(`${WIKI_API}?${params}`);
+      if (!res.ok) return {} as Record<string, PageData>;
+      const data = await res.json();
+      return (data.query?.pages ?? {}) as Record<string, PageData>;
+    })
+  );
 
-  for (const chunk of chunks) {
-    const params = new URLSearchParams({
-      action: 'query',
-      pageids: chunk.join('|'),
-      prop: 'extracts|pageimages|coordinates',
-      exintro: 'true',
-      explaintext: 'true',
-      exsentences: '10',
-      pithumbsize: '200',
-      format: 'json',
-      origin: '*',
-    });
-    const res = await fetch(`${WIKI_API}?${params}`);
-    if (!res.ok) continue;
-    const data = await res.json();
-    const pages: Record<string, PageData> = data.query?.pages ?? {};
+  const allPages: Record<number, PageData> = {};
+  for (const pages of results) {
     for (const page of Object.values(pages)) {
       allPages[page.pageid] = page;
     }
   }
-
   return allPages;
 }
 
@@ -115,25 +131,29 @@ export async function fetchNearbyFacts(lat: number, lon: number): Promise<Fact[]
   }
 
   let geoEntries: GeoSearchEntry[] = [];
-  for (const radius of RADIUS_STEPS) {
-    geoEntries = await geoSearch(lat, lon, radius);
+  let usedRadius = RADIUS_STEPS[0];
+  for (const r of RADIUS_STEPS) {
+    geoEntries = await geoSearch(lat, lon, r);
+    usedRadius = r;
     if (geoEntries.length >= 5) break;
   }
 
+  const sampledGeo = diverseSample(geoEntries, usedRadius, 50);
+
   let fallbackEntries: GeoSearchEntry[] = [];
-  if (geoEntries.length < 3) {
+  if (sampledGeo.length < 3) {
     fallbackEntries = await nominatimFallback(lat, lon);
   }
 
   const seen = new Set<number>();
-  const entries = [...geoEntries, ...fallbackEntries].filter((e) => {
+  const entries = [...sampledGeo, ...fallbackEntries].filter((e) => {
     if (seen.has(e.pageid)) return false;
     seen.add(e.pageid);
     return true;
   });
   if (entries.length === 0) return [];
 
-  const geoPageIds = new Set(geoEntries.map((e) => e.pageid));
+  const geoPageIds = new Set(sampledGeo.map((e) => e.pageid));
   const pageIds = entries.map((e) => e.pageid);
   const pageDetails = await fetchPageDetails(pageIds);
 

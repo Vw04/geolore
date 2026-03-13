@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import BrandLogo from './BrandLogo';
-import type { NotifSettings } from '../services/keystore';
+import type { NotifSettings, DisplaySettings } from '../services/keystore';
 import { startWalkAround, stopWalkAround, isWalkAroundRunning } from '../services/walkAround';
 
 const ALL_INTERESTS = [
@@ -32,24 +33,27 @@ type Props = {
   visible: boolean;
   interests: string[];
   notifSettings: NotifSettings;
-  onSave: (interests: string[], notif: NotifSettings) => void;
+  displaySettings: DisplaySettings;
+  onSave: (interests: string[], notif: NotifSettings, display: DisplaySettings) => void;
   onClose: () => void;
 };
 
-export default function SettingsScreen({ visible, interests, notifSettings, onSave, onClose }: Props) {
+export default function SettingsScreen({ visible, interests, notifSettings, displaySettings, onSave, onClose }: Props) {
   const [selectedInterests, setSelectedInterests] = useState<string[]>(interests);
   const [notif, setNotif] = useState<NotifSettings>(notifSettings);
+  const [display, setDisplay] = useState<DisplaySettings>(displaySettings);
 
   // Sync toggle with actual OS walk-around state when modal opens
   useEffect(() => {
     if (visible) {
       setSelectedInterests(interests);
       setNotif(notifSettings);
+      setDisplay(displaySettings);
       isWalkAroundRunning().then((running) => {
         setNotif((prev) => ({ ...prev, enabled: running }));
       });
     }
-  }, [visible, interests, notifSettings]);
+  }, [visible, interests, notifSettings, displaySettings]);
 
   const handleWalkAroundToggle = async (val: boolean) => {
     if (val) {
@@ -103,6 +107,35 @@ export default function SettingsScreen({ visible, interests, notifSettings, onSa
             })}
           </View>
 
+          <Text style={styles.sectionLabel}>SORT ORDER</Text>
+          <View style={styles.segRow}>
+            {(['distance', 'notable'] as const).map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.seg, display.sortOrder === opt && styles.segActive]}
+                onPress={() => setDisplay({ ...display, sortOrder: opt })}
+              >
+                <Text style={[styles.segText, display.sortOrder === opt && styles.segTextActive]}>
+                  {opt === 'distance' ? 'Closest Distance' : 'Most Notable'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.sectionLabel}>MAX FACTS PER REFRESH</Text>
+          <Text style={styles.subLabel}>Up to {display.maxFacts} fact{display.maxFacts === 1 ? '' : 's'}</Text>
+          <Slider
+            style={{ width: '100%', height: 32 }}
+            minimumValue={1}
+            maximumValue={10}
+            step={1}
+            value={display.maxFacts}
+            onValueChange={(v) => setDisplay({ ...display, maxFacts: Math.round(v) })}
+            minimumTrackTintColor="#2A9D8F"
+            maximumTrackTintColor="#1E5038"
+            thumbTintColor="#FFFFF0"
+          />
+
           <Text style={styles.sectionLabel}>NOTIFICATIONS</Text>
 
           <View style={styles.row}>
@@ -145,7 +178,7 @@ export default function SettingsScreen({ visible, interests, notifSettings, onSa
             ))}
           </View>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={() => onSave(selectedInterests, notif)}>
+          <TouchableOpacity style={styles.saveBtn} onPress={() => onSave(selectedInterests, notif, display)}>
             <Text style={styles.saveBtnText}>Save Settings</Text>
           </TouchableOpacity>
         </ScrollView>

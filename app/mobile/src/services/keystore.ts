@@ -6,17 +6,25 @@ export type NotifSettings = {
   bulletCount: 1 | 2 | 3;
 };
 
+export type DisplaySettings = {
+  sortOrder: 'distance' | 'notable';
+  maxFacts: number; // 1–10
+};
+
 const NOTIF_DEFAULTS: NotifSettings = {
   enabled: false,
   frequencyMs: 300000,
   bulletCount: 2,
 };
 
+const DISPLAY_DEFAULTS: DisplaySettings = { sortOrder: 'distance', maxFacts: 5 };
+
 const KEYS = {
   apiKey: 'anthropic_api_key',
   onboardingComplete: 'onboarding_complete',
   userInterests: 'user_interests',
   notifSettings: 'notif_settings',
+  displaySettings: 'display_settings',
 };
 
 export async function getApiKey(): Promise<string | null> {
@@ -58,4 +66,14 @@ export async function getNotifSettings(): Promise<NotifSettings> {
 
 export async function setNotifSettings(s: NotifSettings): Promise<void> {
   return AsyncStorage.setItem(KEYS.notifSettings, JSON.stringify(s));
+}
+
+export async function getDisplaySettings(): Promise<DisplaySettings> {
+  const val = await AsyncStorage.getItem(KEYS.displaySettings);
+  if (!val) return { ...DISPLAY_DEFAULTS };
+  try { return { ...DISPLAY_DEFAULTS, ...JSON.parse(val) }; } catch { return { ...DISPLAY_DEFAULTS }; }
+}
+
+export async function setDisplaySettings(s: DisplaySettings): Promise<void> {
+  return AsyncStorage.setItem(KEYS.displaySettings, JSON.stringify(s));
 }
